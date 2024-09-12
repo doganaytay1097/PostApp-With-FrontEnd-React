@@ -6,7 +6,8 @@ import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import {Button, OutlinedInput, InputAdornment, Snackbar, Alert} from "@mui/material";
 import {makeStyles} from '@mui/styles';
-import {Link} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
+import {PostWithAuth, RefreshToken} from "../../services/HttpService";
 
 const useStyles = makeStyles(() => ({
     avatar: {
@@ -29,27 +30,63 @@ const useStyles = makeStyles(() => ({
 }));
 
 function PostForm(props) {
-    const {userId, userName,refreshPost} = props;
+    const {userId, refreshPost,userName} = props;
+    const navigate = useNavigate();
     const classes = useStyles();
     const [text, setText] = useState("");
     const [title, setTitle] = useState("");
     const [isSent, setIsSent] = useState(false);
 
-
     const savePost = () => {
-        fetch("/posts", {
-            method: "POST",
-            headers: {
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                title: title,
-                userId: userId,
-                text: text,
-            })
+        PostWithAuth("/posts", {
+            title: title,
+            userId: userId,
+            text: text,
         })
-            .then(res => res.json())
-            .catch(err => console.log(err));
+            .then((res) => {
+                if (!res.ok) {
+                    // Eğer istek başarısızsa, token süresi dolmuş olabilir.
+                    RefreshToken()
+                        .then((res) => {
+                            if (!res.ok) {
+                                logout(); // Token yenileme başarısızsa çıkış yap
+                            } else {
+                                return res.json();
+                            }
+                        })
+                        .then((result) => {
+                            if (result) {
+                                localStorage.setItem("tokenKey", result.accessToken); // Yeni token'ı kaydet
+                                savePost(); // Token yenilendikten sonra tekrar savePost çağrılır
+                            }
+                        })
+                        .catch((err) => {
+                            console.log("Token yenileme hatası:", err);
+                        });
+                } else {
+                    return res.json(); // Eğer istek başarılıysa yeni postu dönüyoruz
+                }
+            })
+            .then((newPost) => {
+                if (newPost) {
+                    refreshPost(newPost); // Yeni postu Home bileşenine iletiyoruz
+                    setIsSent(true);
+                    setTitle("");
+                    setText("");
+                }
+            })
+            .catch((err) => {
+                console.log("savePost hatası:", err);
+            });
+    };
+
+
+    const logout = () => {
+        localStorage.removeItem('tokenKey');
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('refreshKey');
+        localStorage.removeItem('userName');
+        navigate(0); // navigate kullanarak sayfayı yeniden yükle
     }
 
     const handleSubmit = () => {
@@ -64,7 +101,6 @@ function PostForm(props) {
         if (reason === 'clickaway') {
             return;
         }
-
         setIsSent(false);
     };
 
@@ -78,7 +114,6 @@ function PostForm(props) {
         setIsSent(false);
     }
 
-
     return (
         <div style={{width: '800px', marginBottom: '20px'}}>
             <Snackbar open={isSent} autoHideDuration={1200} onClose={handleClose}>
@@ -88,7 +123,7 @@ function PostForm(props) {
                     variant="filled"
                     sx={{ width: '100%' }}
                 >
-                    Your post sent.
+                    Gönderiniz gönderildi.
                 </Alert>
             </Snackbar>
             <Card className={classes.card}>
@@ -105,7 +140,7 @@ function PostForm(props) {
                             <OutlinedInput
                                 id="outlined-adornment-amount"
                                 multiline
-                                placeholder="Title"
+                                placeholder="Başlık"
                                 inputProps={{maxLength: 25}}
                                 fullWidth
                                 value={title}
@@ -119,7 +154,7 @@ function PostForm(props) {
                         <OutlinedInput
                             id="outlined-adornment-amount"
                             multiline
-                            placeholder="Text"
+                            placeholder="Metin"
                             inputProps={{maxLength: 250}}
                             fullWidth
                             value={text}
@@ -133,7 +168,7 @@ function PostForm(props) {
                                             }}
                                             onClick={handleSubmit}
                                     >
-                                        Post
+                                        Gönder
                                     </Button>
                                 </InputAdornment>
                             }

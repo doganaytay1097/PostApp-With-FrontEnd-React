@@ -41,24 +41,38 @@ function Home() {
                     setIsLoaded(true);
                     setError(error);
                 }
-            )
-    }
+            );
+    };
 
     useEffect(() => {
-        refreshPost();
-    }, [postList]);
+        refreshPost();  // Component ilk yüklendiğinde post'ları getir
+    }, []);
 
     if (error) {
-        return <div>Error: {error.message}</div>;
+        return <div>Hata: {error.message}</div>;
     } else if (!isLoaded) {
-        return <div>Loading...</div>;
+        return <div>Yükleniyor...</div>;
     } else {
         return (
             <div className={classes.container}>
-                <PostForm userId={1} userName={"name"} refreshPost={refreshPost} />
+                {localStorage.getItem('currentUser') && (
+                    <PostForm
+                        userId={localStorage.getItem('currentUser')}
+                        userName={localStorage.getItem('userName')}
+                        refreshPost={refreshPost} // PostForm'dan post atıldıktan sonra bu fonksiyon çağrılacak
+                    />
+                )}
+
                 {postList.map(post => (
                     <div key={post.id} className={classes.postWrapper}>
-                        <Post userId={post.userId} userName={post.userName} title={post.title} text={post.text} />
+                        <Post
+                            likes={post.postLikes}
+                            postId={post.id}
+                            userId={post.userId}
+                            userName={post.userName}
+                            title={post.title}
+                            text={post.text}
+                        />
                     </div>
                 ))}
             </div>
